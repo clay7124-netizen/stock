@@ -3,60 +3,59 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>StockMaster PRO v4.1 - 專業即時看盤工作站</title>
+  <title>StockMaster PRO v4.2 - 台美股即時工作站</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Babel for in-browser JSX compilation -->
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <!-- Import Map for React, Recharts & Lucide Icons -->
-  <script type="importmap">
-    {
-      "imports": {
-        "react": "https://esm.sh/react@18.2.0",
-        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
-        "recharts": "https://esm.sh/recharts@2.12.7?external=react,react-dom",
-        "lucide-react": "https://esm.sh/lucide-react@0.378.0?external=react"
-      }
-    }
-  </script>
+  <!-- React & ReactDOM (UMD Global - 100% Safari Compatible) -->
+  <script crossorigin src="https://unpkg.com/react@18.2.0/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
+  <!-- Recharts (UMD Global) -->
+  <script crossorigin src="https://unpkg.com/recharts@2.12.7/umd/Recharts.js"></script>
+  <!-- Lucide Icons (UMD Global) -->
+  <script crossorigin src="https://unpkg.com/lucide-react@0.378.0/dist/umd/lucide-react.min.js"></script>
+  <!-- Babel Standalone -->
+  <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <style>
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-    body { background-color: #090D16; margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background-color: #090D16; color: #f1f5f9; margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
   </style>
 </head>
 <body>
-  <div id="root"></div>
+  <!-- 初始載入提示：確保不會看到未知的黑畫面 -->
+  <div id="root">
+    <div style="min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#818cf8;gap:12px;">
+      <div style="font-size:18px;font-weight:800;">⚡ StockMaster PRO 啟動中...</div>
+      <div style="font-size:12px;color:#64748b;">正在連線台美股即時行情引擎</div>
+    </div>
+  </div>
 
-  <script type="text/babel" data-type="module">
-    import React, { useState, useEffect, useMemo, useRef } from 'react';
-    import { createRoot } from 'react-dom/client';
-    import { 
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useRef } = React;
+    const { 
       LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
       AreaChart, Area, BarChart, Bar, Cell, ReferenceLine, ComposedChart
-    } from 'recharts';
-    import { 
+    } = window.Recharts;
+    const { 
       TrendingUp, TrendingDown, Search, Plus, ArrowLeft, 
       Activity, DollarSign, BarChart3, Sliders, Sun, Moon,
       ChevronRight, X, RefreshCw, Trash2, ShieldCheck, AlertTriangle, 
       Clock, Sparkles, Bot, Zap, FileText, Globe, Unplug, Loader2, 
       BarChart4, Waves, Users, Crown, Calendar, Pin, ArrowUpDown, 
       FolderPlus, Download, Upload, Check, Layers, Briefcase
-    } from 'lucide-react';
+    } = window.LucideReact;
 
-    // --- Configuration & Default Keys ---
     const API_UPDATE_INTERVAL = 10000;
     const DEFAULT_FINNHUB_KEY = "d5src99r01qmiccbj6ogd5src99r01qmiccbj6p0";
     const DEFAULT_FUGLE_KEY = "MjhiM2VmNTUtOGQxOS00MzQ5LWIyZmYtZTM1M2I0ZTZjYTJkIDBhZWY3NTljLTQzYTktNGU4Zi1iYWFiLTQ0YmRhNWY5NThmZQ==";
 
-    // --- Accurate Taiwan vs US Stock Identifier ---
-    // Matches 2330, 0050, 00631L, 00981A, 00679B, 00632R, 00635U, 2881A, etc.
+    // 精準識別台股代號（含 00631L, 00981A, 00679B 等英文字尾）
     const isTaiwanStock = (sym) => {
       const clean = String(sym || '').replace('.TW', '').replace('.TWO', '').trim().toUpperCase();
       return /^\d+[A-Z]*$/.test(clean);
     };
 
-    // --- Comprehensive Stock Dictionary (TW & US) ---
     const STOCK_DICT = {
       '2330': { name: '台積電', sector: '半導體', desc: '全球最大晶圓代工廠，先進製程領先全球，為蘋果、輝達主力晶片夥伴。' },
       '2317': { name: '鴻海', sector: '電子代工', desc: '全球最大電子代工服務商(EMS)，積極佈局AI伺服器機櫃與電動車領域。' },
@@ -129,6 +128,7 @@
     const INITIAL_STOCKS_TW = [
       { id: '2330', symbol: '2330.TW', name: '台積電', price: 0, prevClose: 0, sector: '半導體', group: '核心存股', pinned: true, shares: 0, avgCost: 0, desc: STOCK_DICT['2330'].desc },
       { id: '00631L', symbol: '00631L.TW', name: '元大台灣50正2', price: 0, prevClose: 0, sector: '槓桿型ETF', group: 'AI波段', pinned: false, shares: 0, avgCost: 0, desc: STOCK_DICT['00631L'].desc },
+      { id: '00981A', symbol: '00981A.TW', name: '統一台股增長主動ETF', price: 0, prevClose: 0, sector: '主動型ETF', group: 'AI波段', pinned: false, shares: 0, avgCost: 0, desc: STOCK_DICT['00981A'].desc },
       { id: '2317', symbol: '2317.TW', name: '鴻海', price: 0, prevClose: 0, sector: '電子代工', group: 'AI波段', pinned: false, shares: 0, avgCost: 0, desc: STOCK_DICT['2317'].desc },
       { id: '0050', symbol: '0050.TW', name: '元大台灣50', price: 0, prevClose: 0, sector: '市值型ETF', group: '核心存股', pinned: false, shares: 0, avgCost: 0, desc: STOCK_DICT['0050'].desc },
     ];
@@ -137,33 +137,6 @@
       { id: 'NVDA', symbol: 'NVDA', name: '輝達 (NVIDIA)', price: 0, prevClose: 0, sector: 'AI與半導體', group: '科技巨頭', pinned: true, shares: 0, avgCost: 0, desc: STOCK_DICT['NVDA'].desc },
       { id: 'AAPL', symbol: 'AAPL', name: '蘋果 (Apple)', price: 0, prevClose: 0, sector: '消費科技', group: '科技巨頭', pinned: false, shares: 0, avgCost: 0, desc: STOCK_DICT['AAPL'].desc },
       { id: 'TSM', symbol: 'TSM', name: '台積電 ADR', price: 0, prevClose: 0, sector: '半導體', group: '科技巨頭', pinned: false, shares: 0, avgCost: 0, desc: STOCK_DICT['TSM'].desc },
-    ];
-
-    const GURU_PORTFOLIOS = [
-      {
-        id: 'buffett', name: '華倫·巴菲特 (Warren Buffett)', title: '波克夏海瑟威 (Berkshire Hathaway)', image: '💵',
-        desc: '價值投資之父。強調安全邊際、深厚護城河與強勁自由現金流，近期保留高水位現金並穩守金融、消費與能源巨頭。',
-        holdings: [
-          { symbol: 'AAPL', name: '蘋果 (Apple)', weight: '28.1%', price: 0 },
-          { symbol: 'AXP', name: '美國運通 (Amex)', weight: '16.8%', price: 0 },
-          { symbol: 'BAC', name: '美國銀行 (BoA)', weight: '11.2%', price: 0 },
-          { symbol: 'KO', name: '可口可樂 (Coca-Cola)', weight: '9.5%', price: 0 },
-          { symbol: 'CVX', name: '雪佛龍 (Chevron)', weight: '6.4%', price: 0 },
-          { symbol: 'OXY', name: '西方石油 (Occidental)', weight: '4.8%', price: 0 }
-        ]
-      },
-      {
-        id: 'pelosi', name: '南西·裴洛西 (Nancy Pelosi)', title: '美國國會投資風向球', image: '🏛️',
-        desc: '以精準掌握美國科技巨頭與AI政策趨勢聞名，常透過深度價內長期買權(LEAPS Call)佈局AI算力與資安龍頭。',
-        holdings: [
-          { symbol: 'NVDA', name: '輝達 (NVIDIA)', weight: '26.5%', price: 0 },
-          { symbol: 'MSFT', name: '微軟 (Microsoft)', weight: '19.8%', price: 0 },
-          { symbol: 'GOOGL', name: '谷歌 (Alphabet)', weight: '14.5%', price: 0 },
-          { symbol: 'AMZN', name: '亞馬遜 (Amazon)', weight: '12.2%', price: 0 },
-          { symbol: 'PANW', name: 'Palo Alto資安', weight: '9.4%', price: 0 },
-          { symbol: 'AVGO', name: '博通 (Broadcom)', weight: '8.6%', price: 0 }
-        ]
-      }
     ];
 
     const CHART_CACHE = new Map();
@@ -213,10 +186,8 @@
           const sum60 = data.slice(i - 59, i + 1).reduce((a, b) => a + b.close, 0);
           data[i].ma60 = parseFloat((sum60 / 60).toFixed(2));
         }
-
         const baseVal = data[i].ma20 || data[i].close;
         data[i].riverHigh = parseFloat((baseVal * 1.18).toFixed(2));
-        data[i].riverMidHigh = parseFloat((baseVal * 1.09).toFixed(2));
         data[i].riverMid = parseFloat(baseVal.toFixed(2));
         data[i].riverLow = parseFloat((baseVal * 0.85).toFixed(2));
       }
@@ -227,39 +198,31 @@
         const windowSlice = data.slice(startIdx, i + 1);
         const highestHigh = Math.max(...windowSlice.map(x => x.high));
         const lowestLow = Math.min(...windowSlice.map(x => x.low));
-        let rsv = 50;
-        if (highestHigh !== lowestLow) {
-          rsv = ((data[i].close - lowestLow) / (highestHigh - lowestLow)) * 100;
-        }
+        let rsv = highestHigh !== lowestLow ? ((data[i].close - lowestLow) / (highestHigh - lowestLow)) * 100 : 50;
         k = (2 / 3) * k + (1 / 3) * rsv;
         d = (2 / 3) * d + (1 / 3) * k;
         data[i].k = parseFloat(k.toFixed(1));
         data[i].d = parseFloat(d.toFixed(1));
       }
 
-      let ema12 = data[0].close;
-      let ema26 = data[0].close;
-      let dea = 0;
+      let ema12 = data[0].close, ema26 = data[0].close, dea = 0;
       const k12 = 2 / 13, k26 = 2 / 27, k9 = 2 / 10;
-
       for (let i = 0; i < data.length; i++) {
         const c = data[i].close;
         ema12 = c * k12 + ema12 * (1 - k12);
         ema26 = c * k26 + ema26 * (1 - k26);
         const dif = ema12 - ema26;
         dea = dif * k9 + dea * (1 - k9);
-        const osc = dif - dea;
         data[i].dif = parseFloat(dif.toFixed(2));
         data[i].macd = parseFloat(dea.toFixed(2));
-        data[i].osc = parseFloat(osc.toFixed(2));
+        data[i].osc = parseFloat((dif - dea).toFixed(2));
       }
 
       let avgGain = 0, avgLoss = 0;
       for (let i = 0; i < data.length; i++) {
         if (i === 0) { data[i].rsi = 50; continue; }
         const diff = data[i].close - data[i - 1].close;
-        const gain = diff > 0 ? diff : 0;
-        const loss = diff < 0 ? -diff : 0;
+        const gain = diff > 0 ? diff : 0, loss = diff < 0 ? -diff : 0;
         if (i <= 14) {
           avgGain = (avgGain * (i - 1) + gain) / i;
           avgLoss = (avgLoss * (i - 1) + loss) / i;
@@ -269,7 +232,6 @@
         }
         data[i].rsi = avgLoss === 0 ? 100 : parseFloat((100 - 100 / (1 + avgGain / avgLoss)).toFixed(1));
       }
-
       return data;
     };
 
@@ -280,8 +242,7 @@
       if (position < 0.25) valuation = '便宜';
       else if (position > 0.75) valuation = '昂貴';
       const changePercent = prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0;
-      let rawScore = 60 + (changePercent * 5) + (position * 20);
-      if (price > open) rawScore += 5;
+      let rawScore = 60 + (changePercent * 5) + (position * 20) + (price > open ? 5 : 0);
       const health = Math.min(99, Math.max(35, Math.floor(rawScore)));
       const riverTrend = changePercent > 1.2 ? '強勢上攻' : changePercent > 0 ? '緩步墊高' : changePercent > -1.0 ? '盤整修正' : '空方下行';
       return { valuation, health, riverTrend, trendScore: changePercent };
@@ -313,7 +274,6 @@
         valuation: stock.valuation || '-',
         riverTrend: stock.riverTrend || '-',
         health: Number(stock.health) || 50,
-        lastTick: 0,
         source: stock.source || 'init',
         errorMsg: ''
       };
@@ -336,25 +296,20 @@
         `https://corsproxy.io/?${encoded}`,
         `https://api.allorigins.win/raw?url=${encoded}`
       ];
-
       const fetchNode = async (url) => {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), timeoutMs);
         try {
           const res = await fetch(url, { signal: controller.signal });
           clearTimeout(timer);
-          if (!res.ok) throw new Error('Status ' + res.status);
-          const text = await res.text();
-          const json = JSON.parse(text);
-          const actual = json.contents ? JSON.parse(json.contents) : json;
-          if (!actual) throw new Error('Empty JSON');
-          return actual;
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          const json = await res.json();
+          return json.contents ? JSON.parse(json.contents) : json;
         } catch (e) {
           clearTimeout(timer);
           throw e;
         }
       };
-
       return await Promise.any(proxyNodes.map(node => fetchNode(node)));
     };
 
@@ -372,10 +327,7 @@
         case '5Y': startDate.setFullYear(startDate.getFullYear() - 5); break;
         default: startDate.setFullYear(startDate.getFullYear() - 10); break;
       }
-      const startStr = startDate.toISOString().split('T')[0];
-      const url = `https://api.finmindtrade.com/api/v4/data?dataset=${dataset}&data_id=${cleanId}&start_date=${startStr}`;
-
-      const res = await fetch(url);
+      const res = await fetch(`https://api.finmindtrade.com/api/v4/data?dataset=${dataset}&data_id=${cleanId}&start_date=${startDate.toISOString().split('T')[0]}`);
       if (!res.ok) throw new Error('FinMind HTTP error');
       const json = await res.json();
       if (!json.data || json.data.length === 0) throw new Error('FinMind empty');
@@ -413,20 +365,13 @@
         case '5Y': range = '5y'; interval = '1wk'; break;
         default: range = '10y'; interval = '1mo'; break;
       }
-
       const candidates = market === 'TW' ? [`${cleanId}.TW`, `${cleanId}.TWO`] : [cleanId];
-      const tasks = [];
-      candidates.forEach(sym => {
-        tasks.push(fetchWithProxyRace(`https://query1.finance.yahoo.com/v8/finance/chart/${sym}?range=${range}&interval=${interval}`));
-      });
-
-      const data = await Promise.any(tasks);
+      const data = await Promise.any(candidates.map(sym => fetchWithProxyRace(`https://query1.finance.yahoo.com/v8/finance/chart/${sym}?range=${range}&interval=${interval}`)));
       const result = data.chart?.result?.[0];
       if (!result || !result.timestamp) throw new Error('Yahoo empty');
 
-      const timestamps = result.timestamp;
       const q = result.indicators.quote[0];
-      const rawList = timestamps.map((ts, idx) => {
+      const rawList = result.timestamp.map((ts, idx) => {
         const close = q.close[idx];
         if (close == null) return null;
         const d = new Date(ts * 1000);
@@ -452,7 +397,6 @@
     const fetchMasterChartData = async (symbol, rangeType, market, fKey, tKey, forceRefresh = false) => {
       const cacheKey = `${market}_${symbol}_${rangeType}`;
       if (!forceRefresh && CHART_CACHE.has(cacheKey)) return CHART_CACHE.get(cacheKey);
-
       const cleanId = symbol.replace('.TW', '').replace('.TWO', '');
       const competitors = [];
 
@@ -511,13 +455,10 @@
       if (!realData) {
         try {
           const candidates = market === 'TW' ? [`${cleanId}.TW`, `${cleanId}.TWO`] : [cleanId];
-          const data = await Promise.any(
-            candidates.map(sym => fetchWithProxyRace(`https://query1.finance.yahoo.com/v8/finance/chart/${sym}?range=1d&interval=5m`, 3500))
-          );
+          const data = await Promise.any(candidates.map(sym => fetchWithProxyRace(`https://query1.finance.yahoo.com/v8/finance/chart/${sym}?range=1d&interval=5m`, 3500)));
           const meta = data.chart?.result?.[0]?.meta;
           if (meta && meta.regularMarketPrice > 0) {
-            const p = meta.regularMarketPrice;
-            const pc = meta.chartPreviousClose || meta.previousClose || p;
+            const p = meta.regularMarketPrice, pc = meta.chartPreviousClose || meta.previousClose || p;
             realData = {
               price: p, prevClose: pc, change: p - pc,
               changePercent: pc > 0 ? ((p - pc) / pc) * 100 : 0,
@@ -538,8 +479,7 @@
             if (json.data && json.data.length > 0) {
               const last = json.data[json.data.length - 1];
               const prevItem = json.data.length > 1 ? json.data[json.data.length - 2] : last;
-              const p = Number(last.close ?? last.Close);
-              const pc = Number(prevItem.close ?? prevItem.Close ?? p);
+              const p = Number(last.close ?? last.Close), pc = Number(prevItem.close ?? prevItem.Close ?? p);
               const spread = last.spread !== undefined ? Number(last.spread) : (p - pc);
               const prevBase = p - spread;
               realData = {
@@ -560,7 +500,6 @@
       return { ...enhanceStockData(stock), errorMsg: stock.price > 0 ? '' : '休市/待連線' };
     };
 
-    // Smart Technical & Fundamental Strategy Report Generator
     const buildSmartStrategyReport = (stock, c) => {
       if (!c) return `【${stock.name} (${stock.id}) 投資快訊】\n目前即時報價 ${stock.price} (${stock.changePercent >= 0 ? '+' : ''}${stock.changePercent.toFixed(2)}%)。請待歷史 K 線載入完成後再點擊生成完整技術診斷。`;
       const trend = c.ma5 && c.ma20 ? (c.close > c.ma20 && c.ma5 > c.ma20 ? '多頭排列上攻' : c.close < c.ma20 ? '跌破月線整理' : '均線糾結震盪') : stock.riverTrend;
@@ -572,7 +511,6 @@
     function StockMasterApp() {
       const [darkMode, setDarkMode] = useState(() => localStorage.getItem('sm_theme_v4') !== 'light');
       const [market, setMarket] = useState('TW');
-      const [activeTab, setActiveTab] = useState('market');
 
       const [watchlistTW, setWatchlistTW] = useState(() => {
         let twSaved = [], rescuedFromUS = [];
@@ -619,12 +557,10 @@
       const [searchQuery, setSearchQuery] = useState('');
       const [showSearch, setShowSearch] = useState(false);
       const [suggestions, setSuggestions] = useState([]);
-      const [finnhubKey, setFinnhubKey] = useState(() => localStorage.getItem('finnhub_api_key') || DEFAULT_FINNHUB_KEY);
-      const [fugleKey, setFugleKey] = useState(() => localStorage.getItem('fugle_api_key') || DEFAULT_FUGLE_KEY);
+      const [finnhubKey] = useState(() => localStorage.getItem('finnhub_api_key') || DEFAULT_FINNHUB_KEY);
+      const [fugleKey] = useState(() => localStorage.getItem('fugle_api_key') || DEFAULT_FUGLE_KEY);
       const [isUpdating, setIsUpdating] = useState(false);
-      const [deleteTarget, setDeleteTarget] = useState(null);
       const [toastMsg, setToastMsg] = useState('');
-      const [usdTwdRate, setUsdTwdRate] = useState(32.15);
 
       const twListRef = useRef(watchlistTW);
       const usListRef = useRef(watchlistUS);
@@ -637,11 +573,6 @@
       const showToast = (msg) => { setToastMsg(msg); setTimeout(() => setToastMsg(''), 2800); };
 
       useEffect(() => { loadFinMindStockDirectory(); }, []);
-
-      useEffect(() => {
-        const list = market === 'TW' ? watchlistTW : watchlistUS;
-        if (list.length > 0 && !list.some(s => s.id === selectedStockId)) setSelectedStockId(list[0].id);
-      }, [market, watchlistTW, watchlistUS, selectedStockId]);
 
       const runUpdateCycle = async () => {
         setIsUpdating(true);
@@ -666,7 +597,7 @@
         runUpdateCycle();
         const timer = setInterval(runUpdateCycle, API_UPDATE_INTERVAL);
         return () => clearInterval(timer);
-      }, [market, finnhubKey, fugleKey]);
+      }, [market]);
 
       useEffect(() => {
         const q = searchQuery.trim().toUpperCase();
@@ -709,7 +640,7 @@
 
         const quoted = await fetchRealtimeQuote(initialStock, targetMarket, finnhubKey, fugleKey);
         const setter = targetMarket === 'TW' ? setWatchlistTW : setWatchlistUS;
-        setter(prev => prev.map(item => item.id === cleanId ? { ...quoted, group: item.group, pinned: item.pinned, shares: item.shares, avgCost: item.avgCost } : item));
+        setter(prev => prev.map(item => item.id === cleanId ? { ...quoted, group: item.group, pinned: item.pinned } : item));
       };
 
       const handleBatchSubmit = async (e) => {
@@ -746,7 +677,6 @@
             case 'changeDesc': return b.changePercent - a.changePercent;
             case 'changeAsc': return a.changePercent - b.changePercent;
             case 'priceDesc': return b.price - a.price;
-            case 'healthDesc': return b.health - a.health;
             case 'idAsc': return a.id.localeCompare(b.id);
             default: return 0;
           }
@@ -772,13 +702,13 @@
 
           <header className={`sticky top-0 z-30 backdrop-blur-xl border-b ${darkMode ? 'bg-[#090D16]/85 border-slate-800/80' : 'bg-white/85 border-slate-200/80'}`}>
             <div className="max-w-[1440px] mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-xl flex items-center justify-center text-white shadow-lg">
                   <Zap size={19} fill="currentColor" className="text-amber-300" />
                 </div>
                 <div>
                   <h1 className="text-base font-extrabold tracking-tight">StockMaster <span className="text-indigo-500">PRO</span></h1>
-                  <span className="text-[10px] text-slate-400 font-mono">台美股雙棲即時看盤工作站 v4.1</span>
+                  <span className="text-[10px] text-slate-400 font-mono">台美股雙棲即時看盤 v4.2</span>
                 </div>
               </div>
 
@@ -787,8 +717,8 @@
                   {['TW', 'US'].map(m => (
                     <button
                       key={m}
-                      onClick={() => { setMarket(m); setActiveTab('market'); }}
-                      className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${market === m && activeTab === 'market' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}
+                      onClick={() => { setMarket(m); setMobileDetailOpen(false); }}
+                      className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${market === m ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}
                     >
                       {m === 'TW' ? `🇹🇼 台股 (${watchlistTW.length})` : `🇺🇸 美股 (${watchlistUS.length})`}
                     </button>
@@ -806,7 +736,7 @@
 
           <main className="max-w-[1440px] mx-auto px-4 py-4 pb-20">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-              {/* Left Column */}
+              {/* 左側清單與群組 */}
               <div className={`lg:col-span-5 xl:col-span-4 space-y-3 ${mobileDetailOpen ? 'hidden lg:block' : 'block'}`}>
                 <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
                   {currentGroups.map(grp => (
@@ -928,7 +858,7 @@
                 </div>
               </div>
 
-              {/* Right Column: Chart & Technicals */}
+              {/* 右側 K線與技術分析 */}
               <div className={`lg:col-span-7 xl:col-span-8 ${mobileDetailOpen ? 'block' : 'hidden lg:block'}`}>
                 {activeStockObj && (
                   <StockWorkstationDetail
@@ -949,7 +879,7 @@
       );
     }
 
-    function StockWorkstationDetail({ stock, darkMode, market, finnhubKey, fugleKey, onBackMobile, getColor, getBgBadge }) {
+    function StockWorkstationDetail({ stock, darkMode, market, finnhubKey, fugleKey, onBackMobile, getColor }) {
       const [chartType, setChartType] = useState('kline');
       const [timeRange, setTimeRange] = useState('3M');
       const [showMA, setShowMA] = useState(true);
@@ -983,7 +913,9 @@
         <div className={`rounded-3xl border p-4 sm:p-6 space-y-4 ${darkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'}`}>
           <div className="flex flex-wrap items-start justify-between gap-4 border-b pb-4 border-slate-800/40">
             <div className="flex items-center gap-3">
-              <button onClick={onBackMobile} className="lg:hidden p-2 rounded-xl border border-slate-700"><ArrowLeft size={18} /></button>
+              <button onClick={onBackMobile} className="lg:hidden p-2 rounded-xl border border-slate-700 text-indigo-400 flex items-center gap-1 text-xs font-bold">
+                <ArrowLeft size={16} /> 返回清單
+              </button>
               <div>
                 <div className="flex items-center gap-2">
                   <h2 className="text-xl sm:text-2xl font-extrabold">{stock.name}</h2>
@@ -1145,7 +1077,7 @@
       );
     }
 
-    const root = createRoot(document.getElementById('root'));
+    const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<StockMasterApp />);
   </script>
 </body>
