@@ -91,6 +91,58 @@ def fetch_official(session, market, target):
         return {}
 
 
+
+MIRROR_URL = (
+    'https://raw.githubusercontent.com/u159753123-G/'
+    'codex-taiwan-market-data/main/data/market/'
+    'codex_stock_prices_latest.json'
+)
+
+
+def parse_community_mirror(payload, target):
+    """Supplementary public TWSE/TPEx snapshot. Never accept stale or 'previous' rows.
+
+    The third-party JSON is NOT an official TWSE response and is labelled as such.
+    Official source always overrides these values.
+    """
+    if not isinstance(payload, dict) or payload.get('tradeDate') != target:
+        return {}
+    markets = payload.get('markets') or {}
+    symbols = payload.get('symbols') or {}
+    good = {}
+    for code, item in symbols.items():
+        if not isinstance(item, dict) or not re.fullmatch(r'[0-9A-Z]{4,10}', str(code)):
+            continue
+        upstream = str(item.get('market', '')).upper()
+        if upstream not in ('TWSE', 'TPEX'):
+            continue
+        meta = markets.get('TWSE' if upstream == 'TWSE' else 'TPEx') or {}
+        if (meta.get('tradeDate') != target or meta.get('dataStatus') != 'fresh'
+                or meta.get('fetchStatus') != 'success'):
+            continue
+        if item.get('tradeDate') != target or item.get('status') != 'fresh':
+            continue
+        if str(item.get('source', '')).upper() not in ('TWSE', 'TPEX'):
+            continue
+        p = price(item.get('close'))
+        if p is not None:
+            good[code] = {'close': p,
+                          'market': 'twse' if upstream == 'TWSE' else 'tpex',
+                          'source': 'CommunityMirror_' + upstream}
+    return good
+
+
+def fetch_community_mirror(session, target):
+    """Read a GitHub Actions-published full-market snapshot, never older dates."""
+    try:
+        r = session.get(MIRROR_URL, headers=HEADERS, timeout=18)
+        r.raise_for_status()
+        return parse_community_mirror(r.json(), target)
+    except (requests.RequestException, ValueError, TypeError, KeyError) as exc:
+        print(f'GitHub public market mirror unavailable: {exc}', file=sys.stderr)
+        return {}
+
+
 def prior_symbols():
     latest = OUT / 'latest.json'
     if not latest.exists():
@@ -130,21 +182,38 @@ def collect(target, session=None, yahoo_limit=250):
     quotes = {}
     for group in by_market.values():
         quotes.update(group)
+
+    # Secondary GitHub community mirror: distinct service, dates and freshness verified.
+    mirrored = fetch_community_mirror(session, target)
+    mirror_added = 0
+    for code, value in mirrored.items():
+        if code not in quotes:
+            quotes[code] = value
+            mirror_added += 1
+
+    # Historical Yahoo bars are the final fallback. Avoid uncontrolled
+    # multi-thousand-ticker Yahoo requests; this only covers known symbols.
     prior = prior_symbols()
-    missing = [(code, m) for code, m in prior.items() if code not in quotes and m in SOURCES]
+    missing = [(code, m) for code, m in prior.items()
+               if code not in quotes and m in SOURCES]
     if missing:
         from concurrent.futures import ThreadPoolExecutor
         with ThreadPoolExecutor(max_workers=5) as pool:
-            values = list(pool.map(lambda a: yahoo_daily_close(session, *a, target), missing[:yahoo_limit]))
+            values = list(pool.map(
+                lambda a: yahoo_daily_close(session, *a, target),
+                missing[:yahoo_limit]))
         for (code, market), result in zip(missing[:yahoo_limit], values):
             if result:
                 quotes[code] = result
     return {'date': target, 'quotes': quotes,
             'counts': {'TWSE_official': len(by_market['twse']),
                        'TPEx_official': len(by_market['tpex']),
-                       'Yahoo_fallback': sum(v['source']=='Yahoo_Daily_Historical' for v in quotes.values()),
+                       'Community_Mirror': mirror_added,
+                       'Yahoo_fallback': sum(
+                           v['source'] == 'Yahoo_Daily_Historical'
+                           for v in quotes.values()),
                        'total': len(quotes)},
-            'sources': SOURCES}
+            'sources': {**SOURCES, 'community_mirror': MIRROR_URL}}
 
 
 def main():
