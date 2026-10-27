@@ -10,6 +10,8 @@ on:
     # UTC 05:40/05:55/06:10 = Asia/Taipei 13:40/13:55/14:10
     - cron: '40,55 5 * * 1-5'
     - cron: '10 6 * * 1-5'
+    # Catch-up after third-party community mirror refresh at 15:35 local
+    - cron: '10 8 * * 1-5'
 permissions:
   contents: write
 concurrency:
